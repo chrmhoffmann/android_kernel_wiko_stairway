@@ -184,6 +184,6 @@ struct TS_PTPOD
 };
 extern void get_thermal_slope_intercept(struct TS_PTPOD *ts_info);
 extern void set_taklking_flag(bool flag);
-
+extern int mtktscpu_get_cpu_temp(void);
 #endif
 

@@ -843,6 +843,20 @@ static int mtktscpu_get_temp(struct thermal_zone_device *thermal,
 	return 0;
 }
 
+int mtktscpu_get_cpu_temp(void)
+{
+	int curr_temp;
+
+	curr_temp = mtktscpu_get_TC_temp();
+
+	if((curr_temp>100000) | (curr_temp<-30000))
+		printk("[Power/CPU_Thermal] CPU T=%d\n",curr_temp);
+
+
+	return ((unsigned long) curr_temp);
+}
+
+
 static int mtktscpu_bind(struct thermal_zone_device *thermal,
 						struct thermal_cooling_device *cdev)
 {

@@ -1530,11 +1530,7 @@ __init int mt6589_board_init(void)
 #else
 		key = 0;
 #endif
-		if (key != 0)
-			get_serial(key, get_chip_code(), serial_number);
-		else
-			memcpy(serial_number, "0123456789ABCDEF", 16);
-
+		memcpy(serial_number, "WIKO", 4);
 		retval = kobject_init_and_add(&sn_kobj, &sn_ktype, NULL, "sys_info");
 
 		if (retval < 0)

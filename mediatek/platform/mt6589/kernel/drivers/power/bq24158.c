@@ -542,6 +542,12 @@ extern int g_pmic_cid;
 
 void bq24158_hw_init(void)
 {    
+#ifdef TINNO_BQ24158_HIGH_VBATT	    		
+//Ivan    
+    bq24158_config_interface_reg(0x06,0x74); // set ISAFE
+    printk("[fan5405_hw_init] (0x06,0x74)\n");
+#else
+ 
     if(g_enable_high_vbat_spec == 1)
     {
         if(g_pmic_cid == 0x1020)
@@ -560,6 +566,7 @@ void bq24158_hw_init(void)
         printk("[bq24158_hw_init] (0x06,0x70) \n");
         bq24158_config_interface_reg(0x06,0x70); // set ISAFE
     }
+#endif
 }
 
 static int bq24158_driver_probe(struct i2c_client *client, const struct i2c_device_id *id) 

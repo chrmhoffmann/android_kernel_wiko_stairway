@@ -641,7 +641,7 @@ static /*__tcmfunc*/ irqreturn_t disp_irq_handler(int irq, void *dev_id)
                 }
                 if(reg_val&(1<<3))
                 {
-                      if(cnt_rdma_abnormal<100)
+                      //if(cnt_rdma_abnormal<100)
                       {
                           DISP_ERR("IRQ: RDMA0 abnormal! %d times \n", cnt_rdma_abnormal);
                           cnt_rdma_abnormal++;
@@ -649,7 +649,7 @@ static /*__tcmfunc*/ irqreturn_t disp_irq_handler(int irq, void *dev_id)
                 }
                 if(reg_val&(1<<4))
                 {
-                      if(cnt_rdma_underflow<100)
+                      //if(cnt_rdma_underflow<100)
                       {
                           DISP_ERR("IRQ: RDMA0 underflow!%d times \n", cnt_rdma_underflow);
                           cnt_rdma_underflow++;

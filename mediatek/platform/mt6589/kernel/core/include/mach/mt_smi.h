@@ -43,6 +43,7 @@ typedef struct
 {
     MTK_SMI_BWC_SCEN    scenario;
     int                 b_reduce_command_buffer;
+    int                 b_gpu_od;                   /*GPU overdrive enable or not*/
 
 } MTK_SMI_BWC_CONFIG;
 

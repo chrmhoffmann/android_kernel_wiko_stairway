@@ -590,7 +590,8 @@ CHARGER_TYPE hw_charger_type_detection(void)
         ret_val=pmic_config_interface(CHR_CON19,0x2,PMIC_RG_BC11_IPU_EN_MASK,PMIC_RG_BC11_IPU_EN_SHIFT);        
 
         mdelay(80);
-        
+        mdelay(80);	//Ivan
+	
         bLineState_B = INREG16(USBPHYRegs+0x76);
         //xlog_printk(ANDROID_LOG_INFO, "Power/PMIC", "mt_charger_type_detection : step B : bLineState_B=%x\r\n", bLineState_B);
         if(bLineState_B & 0x80)

@@ -33,6 +33,9 @@
 #include <mach/mt_clkmgr.h>     // For clock mgr APIS. enable_clock()/disable_clock().
 #include <mach/sync_write.h>    // For mt65xx_reg_sync_writel().
 #include <mach/mt_spm_idle.h>    // For spm_enable_sodi()/spm_disable_sodi().
+
+#include <mach/m4u.h>
+
 //
 #include "../smi/smi_common.h"
 
@@ -797,6 +800,32 @@ static MINT32 ISP_DumpReg(void)
     {
         LOG_DBG("0x%08X %08X ", ISP_TPIPE_ADDR + i, ISP_RD32(ISP_ADDR + i));
     }
+
+
+{
+    int tpipePA = ISP_RD32(ISP_ADDR + 0x204);
+    int ctlStart = ISP_RD32(ISP_ADDR + 0x000);
+    int ctlTcm = ISP_RD32(ISP_ADDR + 0x054);
+    int map_va=0, map_size;
+    int i;
+    int *pMapVa;
+#define TPIPE_DUMP_SIZE    200
+
+    if((ctlStart&0x01)&&(tpipePA)&&(ctlTcm&0x80000000)){ // for pass2
+        map_va = 0;
+        m4u_mva_map_kernel( tpipePA, TPIPE_DUMP_SIZE, 0, &map_va, &map_size);
+        pMapVa = map_va;
+        LOG_DBG("pMapVa(0x%x),map_size(0x%x)",pMapVa,map_size);
+        LOG_DBG("ctlStart(0x%x),tpipePA(0x%x),ctlTcm(0x%x)",ctlStart,tpipePA,ctlTcm);
+        if(pMapVa){
+            for(i=0;i<TPIPE_DUMP_SIZE;i+=10) {
+                LOG_DBG("[idx(%d)]%08X-%08X-%08X-%08X-%08X-%08X-%08X-%08X-%08X-%08X",i,pMapVa[i],pMapVa[i+1],pMapVa[i+2],pMapVa[i+3],
+                    pMapVa[i+4],pMapVa[i+5],pMapVa[i+6],pMapVa[i+7],pMapVa[i+8],pMapVa[i+9]);
+            }
+        }
+        m4u_mva_unmap_kernel(tpipePA, map_size, map_va);
+    }
+}
 
 
 #if 0

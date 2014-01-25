@@ -1,5 +1,6 @@
 config-type   := auto-merge
 merge-command := python $(MTK_ROOT_BUILD)/tools/config/merge-kconfig.py
+TARGET_BUILD_VARIANT := user
 merge-order   := \
     common \
     platform \

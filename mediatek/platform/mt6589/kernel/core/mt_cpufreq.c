@@ -266,9 +266,9 @@ extern u32 PTP_get_ptp_level(void);
 static void pmic_dvs_init_setting(void)
 {
     int ret=0;
-    ret=pmic_config_interface(0x216, 0x35, 0x7F, 0);   // set 0x35 to Reg[0x216] bit 6:0
+    ret=pmic_config_interface(0x216, 0x23, 0x7F, 0);   // set 0x35 to Reg[0x216] bit 6:0
     ret=pmic_config_interface(0x22A, 0x0, 0x3, 4);      // set 0x0 to Reg[0x22A] bit 5:4
-    ret=pmic_config_interface(0x23C, 0x35, 0x7F, 0);  // set 0x35 to Reg[0x23C] bit 6:0
+    ret=pmic_config_interface(0x23C, 0x23, 0x7F, 0);  // set 0x35 to Reg[0x23C] bit 6:0
     ret=pmic_config_interface(0x22E, 0x2, 0x3, 6);      // set 0x2 to Reg[0x22E] bit 7:6
     ret=pmic_config_interface(0x250, 0x1, 0x3, 4);      // set 0x1 to Reg[0x250] bit 5:4
     ret=pmic_config_interface(0x252, 0x8, 0x7F, 0);  // set 0x8 to Reg[0x252] bit 6:0 (set VSRAM settling voltage offset=50mV)
@@ -963,12 +963,12 @@ static unsigned int mt_thermal_limited_verify(unsigned int target_freq)
 
     for (index = i; index < (mt_cpu_freqs_num * 4); index++)
     {
-        if (mt_cpu_power[i].cpufreq_ncpu == num_online_cpus())
+        if (mt_cpu_power[index].cpufreq_ncpu == num_online_cpus())
         {
-            if (target_freq >= mt_cpu_power[i].cpufreq_khz)
+            if (target_freq >= mt_cpu_power[index].cpufreq_khz)
             {
-                dprintk("target_freq = %d, ncpu = %d\n", mt_cpu_power[i].cpufreq_khz, num_online_cpus());
-                target_freq = mt_cpu_power[i].cpufreq_khz;
+                dprintk("target_freq = %d, ncpu = %d\n", mt_cpu_power[index].cpufreq_khz, num_online_cpus());
+                target_freq = mt_cpu_power[index].cpufreq_khz;
                 break;
             }
         }
@@ -1679,7 +1679,7 @@ static int mt_cpufreq_pdrv_probe(struct platform_device *pdev)
     return cpufreq_register_driver(&mt_cpufreq_driver);
 }
 
-static int mt_cpufreq_suspend(struct platform_device *dev, pm_message_t state)	
+static int mt_cpufreq_suspend(struct device *device)
 {
     xlog_printk(ANDROID_LOG_INFO, "Power/DVFS", "mt_cpufreq_suspend\n");
     #ifdef CPU_DVS_DOWN_SW_SOL
@@ -1689,7 +1689,7 @@ static int mt_cpufreq_suspend(struct platform_device *dev, pm_message_t state)
     return 0;
 }
 
-static int mt_cpufreq_resume(struct platform_device *dev)
+static int mt_cpufreq_resume(struct device *device)
 {
     xlog_printk(ANDROID_LOG_INFO, "Power/DVFS", "mt_cpufreq_resume\n");
 
@@ -1704,12 +1704,23 @@ static int mt_cpufreq_pdrv_remove(struct platform_device *pdev)
     return 0;
 }
 
+struct dev_pm_ops mt_cpufreq_pdrv_pm_ops = {
+    .suspend = mt_cpufreq_suspend,
+    .resume = mt_cpufreq_resume,
+    .freeze = mt_cpufreq_suspend,
+    .thaw = mt_cpufreq_resume,
+    .poweroff = NULL,
+    .restore = mt_cpufreq_resume,
+    .restore_noirq = NULL,
+};
+
 static struct platform_driver mt_cpufreq_pdrv = {
     .probe      = mt_cpufreq_pdrv_probe,
     .remove     = mt_cpufreq_pdrv_remove,
-    .suspend    = mt_cpufreq_suspend,
-    .resume     = mt_cpufreq_resume,
     .driver     = {
+#ifdef CONFIG_PM
+        .pm     = &mt_cpufreq_pdrv_pm_ops,
+#endif
         .name   = "mt-cpufreq",
         .owner  = THIS_MODULE,
     },

@@ -5,4 +5,4 @@ Build Command:
 kernel
 ======
 cd kernel directory
-TARGET_PRODUCT=wiko MTK_ROOT_CUSTOM=../mediatek/custom/ make
+TARGET_PRODUCT=wiko MTK_ROOT_CUSTOM=../mediatek/custom/ make -j3

@@ -800,12 +800,16 @@ int spm_mtcmos_ctrl_mdsys1(int state)
     int err = 0;
     volatile unsigned int val;
     unsigned long flags;
+    int count = 0;
 
     spm_mtcmos_noncpu_lock(flags);
 
     if (state == STA_POWER_DOWN) {
         spm_write(TOPAXI_PROT_EN, spm_read(TOPAXI_PROT_EN) | MD1_PROT_MASK);
         while ((spm_read(TOPAXI_PROT_STA1) & MD1_PROT_MASK) != MD1_PROT_MASK) {
+            count++;
+            if(count==1000)
+                break;
         }
 
         spm_write(SPM_MD1_PWR_CON, spm_read(SPM_MD1_PWR_CON) | MD_SRAM_PDN);
@@ -866,12 +870,16 @@ int spm_mtcmos_ctrl_mdsys2(int state)
     int err = 0;
     volatile unsigned int val;
     unsigned long flags;
+    int count = 0;
 
     spm_mtcmos_noncpu_lock(flags);
 
     if (state == STA_POWER_DOWN) {
         spm_write(TOPAXI_PROT_EN, spm_read(TOPAXI_PROT_EN) | MD2_PROT_MASK);
         while ((spm_read(TOPAXI_PROT_STA1) & MD2_PROT_MASK) != MD2_PROT_MASK) {
+            count++;
+            if(count==1000)
+                break;
         }
 
         spm_write(SPM_MD2_PWR_CON, spm_read(SPM_MD2_PWR_CON) | MD_SRAM_PDN);

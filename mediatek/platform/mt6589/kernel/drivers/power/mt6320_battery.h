@@ -19,7 +19,8 @@
  ****************************************************************************/
 //#define MAX_CHARGING_TIME                   8*60*60 	// 8hr
 //#define MAX_CHARGING_TIME                   12*60*60 	// 12hr
-#define MAX_CHARGING_TIME                   24*60*60 	// 24hr
+//#define MAX_CHARGING_TIME                   24*60*60 	// 24hr
+#define MAX_CHARGING_TIME                   	7*60*60 	// 6hr
 #define MAX_POSTFULL_SAFETY_TIME       		1*30*60 	// 30mins
 #define MAX_PreCC_CHARGING_TIME         	1*30*60  	// 0.5hr
 #define MAX_CV_CHARGING_TIME              	3*60*60 	// 3hr

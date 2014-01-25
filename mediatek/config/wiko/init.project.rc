@@ -2,6 +2,14 @@
 on early-init
     mkdir /mnt/usbotg 0000 system system
 
+on post-fs
+# modifed for OWS get system certificate 
+    mount ext4 /emmc@sec_ro /system/secro nosuid nodev	
+    chmod 777 /system/secro
+    chown system system /system/secro
+
+    chmod 777 /system/secro/TrackPop
+    chmod 777 /system/secro/TrackSms
 on post-fs-data
 
 #

@@ -542,6 +542,12 @@ extern int g_pmic_cid;
 
 void fan5405_hw_init(void)
 {    
+#ifdef TINNO_FAN5405_HIGH_VBATT	    		
+//Ivan    
+    fan5405_config_interface_liao(0x06,0x74); // set ISAFE
+    printk("[fan5405_hw_init] (0x06,0x74)\n");
+#else
+ 
     if(g_enable_high_vbat_spec == 1)
     {
         if(g_pmic_cid == 0x1020)
@@ -560,6 +566,7 @@ void fan5405_hw_init(void)
         printk("[fan5405_hw_init] (0x06,0x70) \n");
         fan5405_config_interface_liao(0x06,0x70); // set ISAFE
     }
+#endif
 }
 
 static int fan5405_driver_probe(struct i2c_client *client, const struct i2c_device_id *id) 

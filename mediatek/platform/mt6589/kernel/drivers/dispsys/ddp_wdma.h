@@ -24,6 +24,7 @@ enum WDMA_OUTPUT_FORMAT {
     WDMA_OUTPUT_FORMAT_BGRA = 0xa1,
     WDMA_OUTPUT_FORMAT_ABGR = 0xa2,
     WDMA_OUTPUT_FORMAT_RGBA = 0xa3,
+    WDMA_OUTPUT_FORMAT_YUY2 = 0xa4,
 
     /*WDMA_OUTPUT_FORMAT_Y1V0Y0U0,   // UV format by swap
     WDMA_OUTPUT_FORMAT_V0Y1U0Y0,
@@ -64,6 +65,8 @@ int WDMAConfig(unsigned idx,                                                    
                unsigned clipX, unsigned clipY, unsigned clipWidth, unsigned clipHeight, // clip
                unsigned outputFormat, unsigned dstAddress, unsigned dstWidth,           // output
                bool useSpecifiedAlpha, unsigned char alpha);                            // alpha
+               
+int WDMAConfigUV(unsigned idx, unsigned int uAddr, unsigned int vAddr, unsigned int dstWidth);
 
 void WDMAWait(unsigned idx);
 

@@ -686,7 +686,7 @@ void mt65xx_eint_set_hw_debounce(unsigned int eint_num, unsigned int ms)
  */
 void eint_do_tasklet(unsigned long unused)
 {
-	wake_lock_timeout(&EINT_suspend_lock, HZ / 2);
+	wake_lock_timeout(&EINT_suspend_lock, HZ*2);
 }
 
 DECLARE_TASKLET(eint_tasklet, eint_do_tasklet, 0);

@@ -73,7 +73,19 @@
 
 int Enable_BATDRV_LOG = 2;
 
+#ifdef TINNO_BQ24158_HIGH_VBATT	    		
+int g_low_power_ready = 1;	//Ivan 0 to 1
+//Ivan
+int g_ChargingCycle = 0;
+int g_CCMode = 0;
+#else
 int g_low_power_ready = 0;
+#endif
+
+#ifdef TINNO_2_STAGE_CHANGING_FOR_INDIA
+int g_ChargingStage = 0;
+int g_StageCounter = 0;
+#endif
 
 void pchr_turn_off_charging_bq24158 (void);
 void pchr_turn_on_charging_bq24158 (void);
@@ -83,6 +95,7 @@ int g_enable_high_vbat_spec = 1;
 #else
 int g_enable_high_vbat_spec = 0;    
 #endif
+#define bq24158_AC_CHARGING_CURRENT_750  //line wangyanhui add
 
 extern int g_pmic_cid;
 
@@ -428,6 +441,9 @@ int post_charging_time=0;
 
 extern kal_int32 gFG_booting_counter_I_FLAG;
 int g_fg_ready_flag = 0;
+
+//LINE<JIRA_ID><DATE20130320><BUG_INFO>zenghaihui
+//extern kal_uint8 g_tp_charger_flag;
 
 int read_tbat_value(void)
 {
@@ -1335,23 +1351,29 @@ BATT_TEMPERATURE Batt_Temperature_Table[] = {
 
 #if (BAT_NTC_10 == 1)
     BATT_TEMPERATURE Batt_Temperature_Table[] = {
-        {-20,68237},
-        {-15,53650},
-        {-10,42506},
-        { -5,33892},
-        {  0,27219},
-        {  5,22021},
-        { 10,17926},
-        { 15,14674},
-        { 20,12081},
+        {-30,124607},
+        {-25,94918},
+        {-20,73035},
+        {-15,56734},
+        {-10,44468},
+        { -5,35150},
+        {  0,28008},
+        {  5,22486},
+        { 10,18182},
+        { 15,14803},
+        { 20,12129},
         { 25,10000},
-        { 30,8315},
-        { 35,6948},
-        { 40,5834},
-        { 45,4917},
-        { 50,4161},
-        { 55,3535},
-        { 60,3014}
+        { 30,8292},
+        { 35,6914},
+        { 40,5795},
+        { 45,4872},
+        { 50,4101},
+        { 55,3467},
+        { 60,2936},
+        { 65,2494},
+        { 70,2130},
+        { 75,1817},
+        { 80,1562}
     };
 #endif
 
@@ -1382,21 +1404,21 @@ BATT_TEMPERATURE Batt_Temperature_Table[] = {
         #if 0
         xlog_printk(ANDROID_LOG_DEBUG, "Power/Battery", "Res>=%d\n", Batt_Temperature_Table[0].TemperatureR);
         #endif
-        TBatt_Value = -20;
+        TBatt_Value = -30;
     }
-    else if(Res<=Batt_Temperature_Table[16].TemperatureR)
+    else if(Res<=Batt_Temperature_Table[22].TemperatureR)
     {
         #if 0
         xlog_printk(ANDROID_LOG_DEBUG, "Power/Battery", "Res<=%d\n", Batt_Temperature_Table[16].TemperatureR);
         #endif
-        TBatt_Value = 60;
+        TBatt_Value = 80;
     }
     else
     {
         RES1=Batt_Temperature_Table[0].TemperatureR;
         TMP1=Batt_Temperature_Table[0].BatteryTemp;
 
-        for(i=0;i<=16;i++)
+        for(i=0;i<=22;i++)
         {
             if(Res>=Batt_Temperature_Table[i].TemperatureR)
             {
@@ -1536,10 +1558,15 @@ void select_charging_curret_bcct(void)
     else if( (BMT_status.charger_type == STANDARD_CHARGER) ||
              (BMT_status.charger_type == CHARGING_HOST) )
     {
+#ifdef TINNO_BQ24158_HIGH_VBATT	
+        bq24158_config_interface_reg(0x06,0x74); //Ivan set ISAFE
+        bq24158_config_interface_reg(0x01,0xF8);
+        bq24158_config_interface_reg(0x02,0x8E);
+#else
         bq24158_config_interface_reg(0x06,0x70); //set ISAFE
         bq24158_config_interface_reg(0x01,0xF8);
         bq24158_config_interface_reg(0x02,0x8E);
-        
+#endif	
         //---------------------------------------------------
         //set IOCHARGE
         if(g_bcct_value < 550)        pchr_turn_off_charging_bq24158();
@@ -1633,6 +1660,10 @@ void ChargerHwInit_bq24158(void)
 
     if(temp_init_flag==0)
     {
+//Ivan removed
+#ifdef TINNO_BQ24158_HIGH_VBATT	
+        bq24158_config_interface_reg(0x06,0x74);	//Ivan Vsafe = V4.34V
+#else
         if(g_enable_high_vbat_spec == 1)
         {
             if(g_pmic_cid == 0x1020)
@@ -1642,10 +1673,19 @@ void ChargerHwInit_bq24158(void)
         }
         else
             bq24158_config_interface_reg(0x06,0x70);
+#endif
         
         bq24158_config_interface_reg(0x00,0x80);
-        bq24158_config_interface_reg(0x01,0xb9);
+        bq24158_config_interface_reg(0x01,0xb8);		//Ivan change from 0xB9 to 0xB8 ???
+//Ivan removed
+#ifdef TINNO_BQ24158_HIGH_VBATT	
+        bq24158_config_interface_reg(0x02,0x8E);       	//Ivan
 
+	if (g_CCMode)
+	    bq24158_set_oreg(0x23);		//Ivan decrease the Vreg to 4.2V
+	else
+	    bq24158_set_oreg(TINNO_BQ24158_VOREG);		//Ivan 4.22V		
+#else
         if(g_enable_high_vbat_spec == 1)
         {
             if(g_pmic_cid == 0x1020)
@@ -1655,7 +1695,7 @@ void ChargerHwInit_bq24158(void)
         }
         else
             bq24158_config_interface_reg(0x02,0x8e);
-        
+#endif
         bq24158_config_interface_reg(0x05,0x04);
         
         if(g_low_power_ready == 1)
@@ -1720,7 +1760,9 @@ void bq24158_set_ac_current(void)
     //3). 0x02h->0x8Eh
     //4). 0x04h->0x19h
     //5). 0x05h->0x04h
-
+#ifdef TINNO_BQ24158_HIGH_VBATT	
+    bq24158_config_interface_reg(0x06,0x74); //Ivan set ISAFE	Isafe = 1250mA; Vsafe = 4.34V
+#else
     if(g_enable_high_vbat_spec == 1)
     {
         if(g_pmic_cid == 0x1020)
@@ -1730,6 +1772,7 @@ void bq24158_set_ac_current(void)
     }
     else
         bq24158_config_interface_reg(0x06,0x70); //set ISAFE
+#endif
     
 #if defined(MTK_JEITA_STANDARD_SUPPORT)  
      if(g_temp_status == TEMP_NEG_10_TO_POS_0)
@@ -1769,7 +1812,13 @@ void bq24158_set_ac_current(void)
      }
 #else    
     bq24158_config_interface_reg(0x01,0xF8);
-
+#ifdef TINNO_BQ24158_HIGH_VBATT	
+        bq24158_config_interface_reg(0x02,0x9A);       	//Ivan change VOREG to 4.26 //0x9A
+	if (g_CCMode)
+	    bq24158_set_oreg(0x23);		//Ivan decrease the Vreg to 4.2V
+	else
+	    bq24158_set_oreg(TINNO_BQ24158_VOREG);		//Ivan 4.26V		
+#else
     if(g_enable_high_vbat_spec == 1)
     {
         if(g_pmic_cid == 0x1020)
@@ -1779,6 +1828,7 @@ void bq24158_set_ac_current(void)
     }
     else
         bq24158_config_interface_reg(0x02,0x8E);
+#endif
 
     #if defined(bq24158_AC_CHARGING_CURRENT_1250)
         reg_set_value=0x70;
@@ -1806,7 +1856,21 @@ void bq24158_set_ac_current(void)
         #endif
     #endif
     if(g_low_power_ready == 1)
+//Ivan	
+#ifdef TINNO_BQ24158_HIGH_VBATT	
+    {
+        reg_set_value += 0x0A;		//Ivan 0x09 = 133mA; 0x08 = 60mA; 0x0A = 150mA
+#ifdef TINNO_2_STAGE_CHANGING_FOR_INDIA
+	if (g_ChargingStage == 1)
+	{
+	    reg_set_value &= 0xF0;
+	    reg_set_value += 0x08;		//Ivan 0x09 = 133mA; 0x08 = 60mA; 0x0A = 150mA
+	}
+#endif
+    }   
+#else
         reg_set_value += 0x09;
+#endif
     else
         reg_set_value += 0x0B;
     bq24158_config_interface_reg(0x04,reg_set_value);
@@ -1850,7 +1914,9 @@ void select_charging_curret_bq24158(void)
     {    
         if ( BMT_status.charger_type == STANDARD_HOST ) 
         {
-
+#ifdef TINNO_BQ24158_HIGH_VBATT	    		
+	    bq24158_set_oreg(0x23);		//Ivan decrease the Vreg to 4.2V
+#endif
             if (g_Support_USBIF == 1)
             {
                 if (g_usb_state == USB_SUSPEND)
@@ -1967,7 +2033,11 @@ void select_charging_curret_bq24158(void)
                 }
             }
 #else        
-            bq24158_config_interface_reg(0x01,0x78);
+            bq24158_set_ac_current(); //LINE<20120111><charger current>wangyanhui
+#ifdef TINNO_BQ24158_HIGH_VBATT	    		
+	    	bq24158_set_oreg(0x23);		//Ivan decrease the Vreg to 4.2V
+#endif
+            //bq24158_config_interface_reg(0x01,0x78);
 #endif            
             if (Enable_BATDRV_LOG == 1) {
                 printk("[BATTERY:bq24158] BMT_status.charger_type == NONSTANDARD_CHARGER \r\n");    
@@ -2046,6 +2116,7 @@ void pchr_turn_on_charging_bq24158(void)
 
 void pchr_turn_off_charging_bq24158 (void)
 {
+    temp_init_flag = 0;			//modify by wangyanhui 20130220
 #if defined(CONFIG_USB_MTK_HDRC_HCD)
     if(mt_usb_is_device())
     {
@@ -2684,6 +2755,9 @@ int BAT_CheckBatteryStatus_bq24158(void)
         return PMU_STATUS_FAIL;
     }
 #else    
+
+    if( upmu_is_chr_det() == KAL_TRUE)
+    {
     #if (BAT_TEMP_PROTECT_ENABLE == 1)
     if ((BMT_status.temperature < MIN_CHARGE_TEMPERATURE) || 
         (BMT_status.temperature == ERR_CHARGE_TEMPERATURE))
@@ -2698,6 +2772,7 @@ int BAT_CheckBatteryStatus_bq24158(void)
         printk(  "[BATTERY] Battery Over Temperature !!\n\r");                
         BMT_status.bat_charging_state = CHR_ERROR;
         return PMU_STATUS_FAIL;       
+    }
     }
 #endif
 
@@ -2745,6 +2820,11 @@ int BAT_CheckBatteryStatus_bq24158(void)
             //FGADC_Reset_SW_Parameter();
         }        
     }
+//Ivan added recovery    
+#ifdef TINNO_BATTERY_FAIL_RECOVERY
+    if (BMT_status.temperature < MAX_RECHARGE_TEMPERATURE && BMT_status.temperature > MIN_RECHARGE_TEMPERATURE)
+	BMT_status.bat_charging_state = CHR_PRE;        
+#endif
     return PMU_STATUS_OK;
 }
 
@@ -2776,7 +2856,9 @@ PMU_STATUS BAT_BatteryStatusFailAction(void)
 
     /*  Disable charger */
     pchr_turn_off_charging_bq24158();
-
+#ifdef TINNO_BQ24158_HIGH_VBATT	    			    
+    g_ChargingCycle = 0;
+#endif
     return PMU_STATUS_OK;
 }
 
@@ -2892,9 +2974,7 @@ void mt_battery_notify_check(void)
 #endif
 
 #if defined(BATTERY_NOTIFY_CASE_0002)
-        if( (BMT_status.temperature >= MAX_CHARGE_TEMPERATURE) || 
-            (BMT_status.temperature < MIN_CHARGE_TEMPERATURE)
-            )
+        if( (BMT_status.temperature >= MAX_CHARGE_TEMPERATURE) /* || (BMT_status.temperature < MIN_CHARGE_TEMPERATURE) */  )
         {
             g_BatteryNotifyCode |= 0x0002;
             xlog_printk(ANDROID_LOG_INFO, "Power/Battery", "[BATTERY] bat_temp(%d) out of range\n", BMT_status.temperature);
@@ -2903,6 +2983,13 @@ void mt_battery_notify_check(void)
         {
             g_BatteryNotifyCode &= ~(0x0002);
         }
+//Ivan added <<
+	if(BMT_status.temperature < MIN_CHARGE_TEMPERATURE)
+	{
+	    g_BatteryNotifyCode |= 0x0020;
+	    printk("[BATTERY] bat_temp(%d) < MIN_CHARGE_TEMPERATURE'C\n", BMT_status.temperature);
+	}
+//Ivan >>        
         if (Enable_BATDRV_LOG == 1) {
             xlog_printk(ANDROID_LOG_INFO, "Power/Battery", "[BATTERY] BATTERY_NOTIFY_CASE_0002 (%x)\n", 
                 g_BatteryNotifyCode);
@@ -2910,13 +2997,24 @@ void mt_battery_notify_check(void)
 #endif
 
 #if defined(BATTERY_NOTIFY_CASE_0003)
-        if( (BMT_status.ICharging > 1000) &&
+        if( (BMT_status.ICharging > 1300) &&	//Ivan change to 1300
             (BMT_status.total_charging_time > 300)
             )
         //if(BMT_status.ICharging > 200) //test
         {
-            g_BatteryNotifyCode |= 0x0004;
-            xlog_printk(ANDROID_LOG_INFO, "Power/Battery", "[BATTERY] I_charging(%ld) > 1000mA\n", BMT_status.ICharging);
+	    
+//Ivan added
+            count = 0;
+            for (index = 0; index < BATTERY_AVERAGE_SIZE; index++)
+            {
+                if (batteryCurrentBuffer[index] > 1300)
+                count++;
+            }
+            if (count > (BATTERY_AVERAGE_SIZE/2))
+            {
+                g_BatteryNotifyCode |= 0x0004;
+                xlog_printk(ANDROID_LOG_INFO, "Power/Battery", "[BATTERY] I_charging(%ld) > 1000mA\n", BMT_status.ICharging);
+            }
         }
         else
         {
@@ -3045,8 +3143,8 @@ void BAT_thread_bq24158(void)
     int i=0;
     int BAT_status = 0;
     //kal_uint32 tmp32;
+    int ret_val=0;    
 #if !defined(MTK_KERNEL_POWER_OFF_CHARGING)	
-    int ret_val=0;
 
     if(boot_check_once==1)
     {
@@ -3089,13 +3187,14 @@ void BAT_thread_bq24158(void)
 #if defined(MTK_JEITA_STANDARD_SUPPORT)        
         //ignore default rule        
 #else    
-        if(BMT_status.temperature >= 60)
+        if(BMT_status.temperature >= 80)		//Ivan change from 60 to 80
         {
 #if defined(CONFIG_POWER_EXT)
             xlog_printk(ANDROID_LOG_DEBUG, "Power/Battery", "[BATTERY] CONFIG_POWER_EXT, no update mt6329_battery_update_power_down.\n");
 #else
             xlog_printk(ANDROID_LOG_INFO, "Power/Battery", "[Battery] Tbat(%d)>=60, system need power down.\n", BMT_status.temperature);
 
+	#if 0 //LINE<20120118>wangyanhui delete
             mt6320_battery_update_power_down(&mt6320_battery_main);
             if( upmu_is_chr_det() == KAL_TRUE )
             {
@@ -3104,6 +3203,7 @@ void BAT_thread_bq24158(void)
             }
             //avoid SW no feedback
             mt_power_off();
+	#endif
 #endif
         }
 #endif        
@@ -3118,7 +3218,15 @@ void BAT_thread_bq24158(void)
         {
             CHR_Type_num = mt_charger_type_detection();                     
             BMT_status.charger_type = CHR_Type_num;
-            
+#ifdef TINNO_BQ24158_HIGH_VBATT	    			    
+            g_ChargingCycle = 0;
+	    g_CCMode = 0;
+#endif
+#ifdef TINNO_2_STAGE_CHANGING_FOR_INDIA
+	    g_ChargingStage = 0;
+	    g_StageCounter = 0;
+#endif
+	    
             if( (CHR_Type_num==STANDARD_HOST) || (CHR_Type_num==CHARGING_HOST) )
             {
                 mt_usb_connect();
@@ -3128,7 +3236,13 @@ void BAT_thread_bq24158(void)
     else 
     {   
         wake_unlock(&battery_suspend_lock);
-    
+#ifdef TINNO_BQ24158_HIGH_VBATT	    			    	
+	g_CCMode = 0;
+#endif
+#ifdef TINNO_2_STAGE_CHANGING_FOR_INDIA
+	    g_ChargingStage = 0;
+	    g_StageCounter = 0;
+#endif	
         BMT_status.charger_type = CHARGER_UNKNOWN;
         BMT_status.bat_full = KAL_FALSE;
         /*Use no gas gauge*/
@@ -3222,6 +3336,9 @@ void BAT_thread_bq24158(void)
     /* Battery Notify Check */    
     mt_battery_notify_check();
 
+    //LINE<JIRA_ID><DATE20130320><BUG_INFO>zenghaihui
+//    g_tp_charger_flag = BMT_status.charger_exist;
+    //xlog_printk(ANDROID_LOG_DEBUG, "Power/Battery", "g_tp_charger_flag = %d \r\n", g_tp_charger_flag);
 #if defined(CONFIG_POWER_EXT)
     xlog_printk(ANDROID_LOG_DEBUG, "Power/Battery", "[BATTERY] CONFIG_POWER_EXT, no update Android.\n");
 #elif defined(MTK_KERNEL_POWER_OFF_CHARGING) 
@@ -3347,12 +3464,28 @@ void BAT_thread_bq24158(void)
                 return;
             }
         }
-
+//Ivan        
         bq24158_status = bq24158_get_chip_status();
         
         /* check battery full */
         if( bq24158_status == 0x2 )
         {
+
+#ifdef TINNO_2_STAGE_CHANGING_FOR_INDIA
+	    if (g_ChargingStage == 0)
+	    {
+                BMT_status.bat_charging_state = CHR_BATFULL;
+		BMT_status.bat_full = KAL_TRUE;    
+		g_bat_full_user_view = KAL_TRUE;
+		g_HW_Charging_Done = 0;		
+		g_ChargingStage = 1;
+		g_StageCounter = 0;
+		pchr_turn_off_charging_bq24158();		
+		pchr_turn_on_charging_bq24158();
+                return;		
+	    }
+#endif	    
+	    
             if(BMT_status.bat_vol >= 3900)
             {
                 BMT_status.bat_charging_state = CHR_BATFULL;
@@ -3363,6 +3496,10 @@ void BAT_thread_bq24158(void)
                 BMT_status.TOPOFF_charging_time = 0;
                 BMT_status.POSTFULL_charging_time = 0;    
                 g_HW_Charging_Done = 1;            
+//Ivan
+#ifdef TINNO_2_STAGE_CHANGING_FOR_INDIA		
+		g_ChargingStage = 2;			//For recharge, we use 150mA terminate current...
+#endif
                 //pchr_turn_off_charging_bq24158();
                 printk("[BATTERY:bq24158] Battery real full and disable charging (%d) \n", bq24158_status); 
                 return;
@@ -3374,9 +3511,44 @@ void BAT_thread_bq24158(void)
             }
         }
         
+//Ivan
+#ifdef TINNO_2_STAGE_CHANGING_FOR_INDIA		        
+        if (g_ChargingStage == 1)
+	{
+	    g_StageCounter++;
+	    if (g_StageCounter > 210)		//35 minutes
+	    {
+		g_ChargingStage = 2;			//To avoid non stop charging...
+	    }
+	}
+	    
+#endif
+	
         /* Charging flow begin */
         BMT_status.total_charging_time += BAT_TASK_PERIOD;
-        pchr_turn_on_charging_bq24158();        
+//Ivan    
+	if(gFG_booting_counter_I_FLAG >= 2)
+	    pchr_turn_on_charging_bq24158();      
+	
+#ifdef TINNO_BQ24158_HIGH_VBATT	    				
+//Ivan Added	
+	g_ChargingCycle++;
+//	printk("[BATTERY:fan5405] Ivan g_ChargingCycle = %d; charger_type = %d; \n",g_ChargingCycle,BMT_status.charger_type);		
+//	printk("[BATTERY:fan5405] Ivan SOC = %d; BMT_status.bat_vol = %d; \n",BMT_status.SOC,BMT_status.bat_vol);		
+	
+//	if ( BMT_status.charger_type == STANDARD_CHARGER  || BMT_status.charger_type == CHARGING_HOST)
+	
+	if (upmu_is_chr_det() == KAL_TRUE)
+	{
+	    if (((BMT_status.SOC >= 90) && (BMT_status.bat_vol > 4195)) || g_CCMode)
+	    {
+		    g_CCMode = 1;
+	    }
+	}
+
+	    
+#endif	
+
         if (Enable_BATDRV_LOG >= 1) {
             printk("[BATTERY:bq24158] Total charging timer=%ld \n", 
                 BMT_status.total_charging_time);    
@@ -3389,6 +3561,14 @@ void BAT_thread_bq24158(void)
     g_last_temp_status = g_temp_status;
 #endif
 
+//add by yangyan begin
+	printk("[BATTERY:bq24158] turn off charging when init thread--------------add by yangyan \n");
+	if(gFG_booting_counter_I_FLAG!=2)
+	{
+		pchr_turn_off_charging_bq24158();
+		printk("[BATTERY:bq24158] turn off charging when power on   thread-------------- \n");
+	}
+	
     if (Enable_BATDRV_LOG >= 1) {
         bq24158_dump_register();
     }
@@ -3420,6 +3600,11 @@ int bat_thread_kthread(void *x)
             if(g_FG_init == 0)
             {
                 g_FG_init=1;
+		// add by yangyan
+		printk( "[bat_thread_kthread]   turn off charging begin----add by yangyan in init");
+		   pchr_turn_off_charging_bq24158();
+		  printk("[bat_thread_kthread]  turn off charging  end ----add by yangyan in init");
+		//add over
                 fgauge_initialization();
                 FGADC_thread_kthread();
                 //sync FG timer

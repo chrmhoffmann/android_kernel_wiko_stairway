@@ -45,7 +45,8 @@ extern int MA_len;
 extern int read_tbat_value(void);
 //static int battery_write_flag=0;
 
-#define mtktsbattery_TEMP_CRIT 60000 /* 60.000 degree Celsius */
+#define mtktsbattery_TEMP_CRIT 80000 //Ivan change to 80 /* 60.000 degree Celsius */
+#define TINNO_TEMP_CRIT 80 	//Ivan change to 80 /* 60.000 degree Celsius */
 
 #define mtktsbattery_dprintk(fmt, args...)   \
 do {                                    \
@@ -112,7 +113,12 @@ static int get_hw_battery_temp(void)
 #else
 	//Phone
 	ret = read_tbat_value();
-	ret = ret * 10;
+//Ivan disable battery temperature sensor
+//	printk("Ivan battery TS = %d \n",ret );
+	if (ret < TINNO_TEMP_CRIT)
+	    ret = 300;			//Fixed at 30 
+	else
+	    ret = ret * 10;		//Power off
 #endif	
 
 	return ret;

@@ -3,6 +3,9 @@
 #include <linux/kernel.h>
 #include <linux/proc_fs.h>
 #include <linux/spinlock.h>
+#include <linux/kthread.h>
+#include <linux/hrtimer.h>
+#include <linux/ktime.h>
 #include <linux/interrupt.h>
 #include <linux/syscore_ops.h>
 #include <linux/platform_device.h>
@@ -65,6 +68,54 @@ static DECLARE_TASKLET(ptp_do_mon_tasklet, ptp_do_mon_tasklet_handler, 0);
 static DECLARE_TASKLET(ptp_do_init2_tasklet, ptp_do_init2_tasklet_handler, 0);
 #endif
 
+static struct hrtimer mt_ptp_timer;
+struct task_struct *mt_ptp_thread = NULL;
+static DECLARE_WAIT_QUEUE_HEAD(mt_ptp_timer_waiter);
+
+static int mt_ptp_timer_flag = 0;
+static int mt_ptp_period_s = 2;
+static int mt_ptp_period_ns = 0;
+
+enum hrtimer_restart mt_ptp_timer_func(struct hrtimer *timer)
+{
+    mt_ptp_timer_flag = 1; wake_up_interruptible(&mt_ptp_timer_waiter);
+    return HRTIMER_NORESTART;
+}
+
+int mt_ptp_thread_handler(void *unused)
+{
+    do
+    {
+        ktime_t ktime = ktime_set(mt_ptp_period_s, mt_ptp_period_ns);
+
+        wait_event_interruptible(mt_ptp_timer_waiter, mt_ptp_timer_flag != 0);
+        mt_ptp_timer_flag = 0;
+
+        clc_notice("PTP_LOG: (%d) - (0x%x, 0x%x, 0x%x, 0x%x, 0x%x, 0x%x, 0x%x, 0x%x) - (%d, %d, %d, %d, %d, %d, %d, %d)\n", \
+                    mtktscpu_get_cpu_temp(), \
+                    DRV_Reg32(PMIC_WRAP_DVFS_WDATA0), \
+                    DRV_Reg32(PMIC_WRAP_DVFS_WDATA1), \
+                    DRV_Reg32(PMIC_WRAP_DVFS_WDATA2), \
+                    DRV_Reg32(PMIC_WRAP_DVFS_WDATA3), \
+                    DRV_Reg32(PMIC_WRAP_DVFS_WDATA4), \
+                    DRV_Reg32(PMIC_WRAP_DVFS_WDATA5), \
+                    DRV_Reg32(PMIC_WRAP_DVFS_WDATA6), \
+                    DRV_Reg32(PMIC_WRAP_DVFS_WDATA7), \
+                    mt_cpufreq_max_frequency_by_DVS(0), \
+                    mt_cpufreq_max_frequency_by_DVS(1), \
+                    mt_cpufreq_max_frequency_by_DVS(2), \
+                    mt_cpufreq_max_frequency_by_DVS(3), \
+                    mt_cpufreq_max_frequency_by_DVS(4), \
+                    mt_cpufreq_max_frequency_by_DVS(5), \
+                    mt_cpufreq_max_frequency_by_DVS(6), \
+                    mt_cpufreq_max_frequency_by_DVS(7));
+
+        hrtimer_start(&mt_ptp_timer, ktime, HRTIMER_MODE_REL);
+    } while (!kthread_should_stop());
+
+    return 0;
+}
+
 #if 1
 static void PTP_set_ptp_volt(void)
 {
@@ -76,8 +127,8 @@ static void PTP_set_ptp_volt(void)
     // set PTP_VO_0 ~ PTP_VO_7 to PMIC
     if( freq_0 != 0 )
     {
-        // 1_188v, 1_063v, 1_013v 
-        if( ( (ptp_level == 4) && (PTP_VO_0 < 79) ) || ( (ptp_level == 2) && (PTP_VO_0 < 54) ) || ( (PTP_VO_0 < 51) ) )    
+        // 1.6G : 1_188v, 1.5G : 1_1255v, 1.4G : 1_063v, 1.2G : 1_013v 
+        if( ( (ptp_level == 4) && (PTP_VO_0 < 79) ) || ( (ptp_level == 3) && (PTP_VO_0 < 68) ) || ( (ptp_level == 2) && (PTP_VO_0 < 54) ) || ( (PTP_VO_0 < 51) ) )    
         {
             // restore default DVFS table (PMIC)
             clc_isr_info("PTP Error : ptp_level = 0x%x, PTP_VO_0 = 0x%x \n", ptp_level, PTP_VO_0);
@@ -300,6 +351,7 @@ irqreturn_t MT6589_PTP_ISR(int irq, void *dev_id)
             PTP_init2_VO_7 = PTP_VO_7;
             
             // show PTP_VO_0 ~ PTP_VO_7 to PMIC
+            clc_isr_info("===============ISR ISR ISR ISR INIT2=============\n");
             clc_isr_info("PTP_VO_0 = 0x%x\n", PTP_VO_0);
             clc_isr_info("PTP_VO_1 = 0x%x\n", PTP_VO_1);
             clc_isr_info("PTP_VO_2 = 0x%x\n", PTP_VO_2);
@@ -354,6 +406,7 @@ irqreturn_t MT6589_PTP_ISR(int irq, void *dev_id)
     {
         // check if thermal sensor init completed?
         temp_0 = (ptp_read( PTP_TEMP ) & 0xff); // temp_0
+        clc_isr_info("thermal sensor temp_0 = 0x%x\n", temp_0);   
         
         if( (temp_0 > 0x4b) && (temp_0 < 0xd3) )
         {
@@ -686,7 +739,15 @@ static void PTP_Monitor_Mode(PTP_Init_T* PTP_Init_val)
 
     // clear all pending PTP interrupt & config PTPINTEN =================================================================
     ptp_write(PTP_PTPINTSTS, 0xffffffff);
-    ptp_write(PTP_PTPINTEN, 0x00FFA002);
+    
+    if (ptp_level < 1 || ptp_level > 3) // non-turbo no PTPOD
+    {
+        ptp_write(PTP_PTPINTEN, 0x00FFA002);
+    }
+    else
+    {
+        ptp_write(PTP_PTPINTEN, 0x00FF0000);
+    }
 
     // enable PTP monitor mode =================================================================
     ptp_write(PTP_PTPEN, 0x00000002);
@@ -758,7 +819,7 @@ u32 PTP_INIT_01(void)
     PTP_Init_value.FREQPCT7 = freq_7;
     
     PTP_Init_value.DETWINDOW = 0xa28;  // 100 us, This is the PTP Detector sampling time as represented in cycles of bclk_ck during INIT. 52 MHz
-    PTP_Init_value.VMAX = 0x62; // 1.3125v (700mv + n * 6.25mv)    
+    PTP_Init_value.VMAX = 0x5D; // 1.28125v (700mv + n * 6.25mv)
     PTP_Init_value.VMIN = 0x28; // 0.95v (700mv + n * 6.25mv)    
     PTP_Init_value.DTHI = 0x01; // positive
     PTP_Init_value.DTLO = 0xfe; // negative (2・s compliment)
@@ -857,7 +918,7 @@ u32 PTP_INIT_02(void)
     PTP_Init_value.FREQPCT7 = freq_7;
 
     PTP_Init_value.DETWINDOW = 0xa28;  // 100 us, This is the PTP Detector sampling time as represented in cycles of bclk_ck during INIT. 52 MHz
-    PTP_Init_value.VMAX = 0x62; // 1.3125v (700mv + n * 6.25mv)    
+    PTP_Init_value.VMAX = 0x5D; // 1.28125v (700mv + n * 6.25mv)    
     PTP_Init_value.VMIN = 0x28; // 0.95v (700mv + n * 6.25mv)    
     PTP_Init_value.DTHI = 0x01; // positive
     PTP_Init_value.DTLO = 0xfe; // negative (2・s compliment)
@@ -966,7 +1027,7 @@ u32 PTP_MON_MODE(void)
     PTP_Init_value.FREQPCT7 = freq_7;
 
     PTP_Init_value.DETWINDOW = 0xa28;  // 100 us, This is the PTP Detector sampling time as represented in cycles of bclk_ck during INIT. 52 MHz
-    PTP_Init_value.VMAX = 0x62; // 1.3125v (700mv + n * 6.25mv)    
+    PTP_Init_value.VMAX = 0x5D; // 1.28125v (700mv + n * 6.25mv)
     PTP_Init_value.VMIN = 0x28; // 0.95v (700mv + n * 6.25mv)    
     PTP_Init_value.DTHI = 0x01; // positive
     PTP_Init_value.DTLO = 0xfe; // negative (2・s compliment)
@@ -1182,6 +1243,45 @@ static ssize_t ptp_debug_write(struct file *file, const char *buffer, unsigned l
     return count;
 }
 
+/***************************************
+* set PTP log enable by sysfs interface
+****************************************/
+static ssize_t ptp_log_en_write(struct file *file, const char *buffer, unsigned long count, void *data)
+{
+    int enabled = 0;
+    ktime_t ktime = ktime_set(mt_ptp_period_s, mt_ptp_period_ns);
+
+    if (sscanf(buffer, "%d", &enabled) == 1)
+    {
+        if (enabled == 1)
+        {
+            clc_notice("ptp log enabled.\n");
+            mt_ptp_thread = kthread_run(mt_ptp_thread_handler, 0, "ptp logging");
+            if (IS_ERR(mt_ptp_thread))
+            {
+                printk("[%s]: failed to create ptp logging thread\n", __FUNCTION__);
+            }
+            hrtimer_start(&mt_ptp_timer, ktime, HRTIMER_MODE_REL);
+        }
+        else if (enabled == 0)
+        {
+           kthread_stop(mt_ptp_thread);
+           hrtimer_cancel(&mt_ptp_timer);
+        }
+        else
+        {
+            clc_notice("ptp log disabled.\n");
+            clc_notice("bad argument!! argument should be \"0\" or \"1\"\n");
+        }
+    }
+    else
+    {
+        clc_notice("bad argument!! argument should be \"0\" or \"1\"\n");
+    }
+
+    return count;
+}
+
 static int __init ptp_init(void)
 {
     struct proc_dir_entry *mt_entry = NULL;
@@ -1189,6 +1289,9 @@ static int __init ptp_init(void)
     int ptp_err = 0;
 
     ptp_data[0] = 0xffffffff;
+
+    hrtimer_init(&mt_ptp_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+    mt_ptp_timer.function = mt_ptp_timer_func;
 
     mt_ptp_dir = proc_mkdir("ptp", NULL);
     if (!mt_ptp_dir)
@@ -1202,6 +1305,12 @@ static int __init ptp_init(void)
         {
             mt_entry->read_proc = ptp_debug_read;
             mt_entry->write_proc = ptp_debug_write;
+        }
+
+        mt_entry = create_proc_entry("ptp_log_en", S_IRUGO | S_IWUSR | S_IWGRP, mt_ptp_dir);
+        if (mt_entry)
+        {
+            mt_entry->write_proc = ptp_log_en_write;
         }
     }
 
@@ -1281,7 +1390,7 @@ u32 PTP_INIT_01_API(void)
     PTP_Init_value.FREQPCT7 = freq_7;
     
     PTP_Init_value.DETWINDOW = 0xa28;  // 100 us, This is the PTP Detector sampling time as represented in cycles of bclk_ck during INIT. 52 MHz
-    PTP_Init_value.VMAX = 0x62; // 1.3125v (700mv + n * 6.25mv)    
+    PTP_Init_value.VMAX = 0x5D; // 1.28125v (700mv + n * 6.25mv)
     PTP_Init_value.VMIN = 0x28; // 0.95v (700mv + n * 6.25mv)    
     PTP_Init_value.DTHI = 0x01; // positive
     PTP_Init_value.DTLO = 0xfe; // negative (2・s compliment)

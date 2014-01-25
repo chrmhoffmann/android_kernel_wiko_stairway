@@ -45,14 +45,24 @@
 *******************************/
 #define GPU_POWER_VCORE_1_05V   (64)
 #define GPU_POWER_VRF18_1_05V   (0)
+#define GPU_POWER_VRF18_1_075V  (1)
 #define GPU_POWER_VRF18_1_10V   (2)
+#define GPU_POWER_VRF18_1_125V  (3)
 #define GPU_POWER_VRF18_1_15V   (4)
+#define GPU_POWER_VRF18_1_175V  (5)
+#define GPU_POWER_VRF18_1_20V   (6)
+
 
 /*****************************************
 * PMIC settle time, should not be changed
 ******************************************/
 #define PMIC_SETTLE_TIME (40) // us
 
+/*****************************************
+* Fixed GPU frequency for some MM scenario
+******************************************/
+#define GPU_KEEP_FREQ_NON_OD_BYPASS (0xFFFF)
+#define GPU_KEEP_VOLT_NON_OD_BYPASS (0xFFFE)
 
 /****************************************************************
 * enable this option to calculate clock on ration in period time.
@@ -67,6 +77,20 @@
 *****************************************************************/
 //#define GPU_DVFS_DEFAULT_DISABLED
 
+/****************************************************************
+* Default enable gpu HYD clock switch
+*****************************************************************/
+//#define GPU_HYD_CLK_SWITCH_ENABLED
+
+/****************************************************************
+* Call disable_pll() when clock switch
+*****************************************************************/
+//#define GPU_CALL_DISABLE_MAIN_MM_PLL
+
+/****************************************************************
+* Control MMPLL
+*****************************************************************/
+//#define GPU_CONTROL_MM_PLL
 
 /********************************************
 * enable this option to adjust buck voltage
@@ -111,4 +135,8 @@ extern unsigned int mt_gpufreq_cur_freq(void);
 extern unsigned int mt_gpufreq_cur_load(void);
 extern int mt_gpufreq_non_register(void);
 extern void mt_gpufreq_set_initial(unsigned int freq_new, unsigned int volt_new);
+extern void mt_gpufreq_keep_frequency_non_OD(bool enable);
+extern void mt_gpufreq_keep_frequency_non_OD_init(unsigned int freq_limit, unsigned int volt_limit);
+extern bool mt_gpufreq_keep_frequency_non_OD_get(void);
+extern void mt_gpufreq_keep_frequency_non_OD_set(bool enable);
 #endif

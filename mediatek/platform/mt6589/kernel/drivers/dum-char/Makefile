@@ -1,5 +1,5 @@
 # Display parameters shown under Settings -> About Phone
-ccflags-y += -I$(MTK_ROOT_CUSTOM)/$(MTK_PROJECT)/common
+
 ifeq ($(CONFIG_MTK_MMC),y)
   CONFIG_MTK_USIF = y
 else

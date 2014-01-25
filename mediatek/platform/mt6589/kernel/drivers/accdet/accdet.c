@@ -31,7 +31,7 @@ static int show_icon_delay = 0;
 
 //ALPS443614: EINT trigger during accdet irq flow running, need add sync method 
 //between both
-static int eint_accdet_sync_flag = 0;
+static int eint_accdet_sync_flag = 1;
 
 static s64 long_press_time_ns = 0 ;
 
@@ -100,7 +100,28 @@ void accdet_auxadc_switch(int enable)
 
 static inline void clear_accdet_interrupt(void);
 #ifdef ACCDET_EINT
-//static int g_accdet_working_in_suspend =0;
+#ifndef ACCDET_MULTI_KEY_FEATURE
+static int g_accdet_working_in_suspend =0;
+//detect if remote button is short pressed or long pressed
+static bool is_long_press(void)
+{
+	int current_status = 0;
+	int index = 0;
+	int count = long_press_time / 100;
+	while(index++ < count)
+	{ 
+		current_status = ((pmic_pwrap_read(ACCDET_STATE_RG) & 0xc0)>>6);
+		if(current_status != 0)
+		{
+			return false;
+		}
+			
+		msleep(100);
+	}
+	
+	return true;
+}
+#endif
 
 static struct work_struct accdet_eint_work;
 static struct workqueue_struct * accdet_eint_workqueue = NULL;

@@ -491,7 +491,15 @@ int disp_path_config_mem_out(struct disp_path_config_mem_out_struct* pConfig)
                    pConfig->srcROI.width,
                    1, 
                    0);      
-        if (!bMemOutEnabled)
+		if(pConfig->outFormat == WDMA_OUTPUT_FORMAT_YUV420_P)
+		{
+			WDMAConfigUV(1, 
+					pConfig->dstAddr + pConfig->srcROI.width * pConfig->srcROI.height,
+					pConfig->dstAddr + pConfig->srcROI.width * pConfig->srcROI.height/4*5,
+					pConfig->srcROI.width);
+		}
+
+		if (!bMemOutEnabled)
         {
         WDMAStart(1);
         // mutex
@@ -1056,6 +1064,7 @@ int disp_path_config_(struct disp_path_config_struct* pConfig, int mutexId)
     DISP_REG_SET(DISP_REG_WDMA_BUF_CON1+0x1000, 0x800800ff);    
 
     DISP_REG_SET(DISP_REG_WDMA_BUF_CON2+0x1000, 0x20200808);
+	DISP_REG_SET(DISP_REG_WDMA_SMI_CON+0x1000, 0x7);//8-16 burst length
 /*************************************************/
        // TDOD: add debug cmd in display to dump register 
 //        disp_dump_reg(DISP_MODULE_OVL);
