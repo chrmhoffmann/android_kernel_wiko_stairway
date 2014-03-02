@@ -46,7 +46,7 @@ CONFIG_PANIC_TIMEOUT=1
 # CONFIG_DEVMEM is not set
 # CONFIG_DEVKMEM is not set
 
-CONFIG_CMDLINE="console=ttyMT3,921600n1 vmalloc=530M slub_max_order=0"
+CONFIG_CMDLINE="console=ttyMT3,921600n1 vmalloc=530M slub_max_order=0 androidboot.selinux=permissive"
 # CONFIG_CFG80211_DEBUGFS is not set
 # CONFIG_LIB80211_DEBUG is not set
 # CONFIG_DM_DEBUG is not set
